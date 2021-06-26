@@ -12,12 +12,13 @@ from utils.visualizer import *
 
 
 def main():
-    #writer = SummaryWriter('runs/exp1')
-    # opt_val = ValOptions().parse()
+    # Set the basic options for train and validation
     opt_train = TrainOptions(is_train=True).parse()
     opt_val = TrainOptions(is_train=False).parse()
+    # Set the metrics for the evaluation of accuracy
     Metric_train = Evaluator(opt_train.class_num)
     Metric_val = Evaluator(opt_train.class_num)
+    # Use the visdom for visualizaiton
     visualizer = Visualizer(opt_train)
     os.environ["CUDA_VISIBLE_DEVICES"] = str(opt_train.gpu_ids)
     # device = torch.device('cuda')
