@@ -5,7 +5,8 @@ import ntpath
 import time
 from . import util, html
 from subprocess import Popen, PIPE
-
+from data.base_dataloader import *
+import matplotlib.pyplot as plt
 
 if sys.version_info[0] == 2:
     VisdomExceptionBase = Exception
@@ -175,6 +176,32 @@ class Visualizer(object):
                     links.append(img_path)
                 webpage.add_images(ims, txts, links, width=self.win_size)
             webpage.save()
+
+    def view_annotated(tensor, nc=class_len, plot=True):
+        image = tensor.numpy()
+        r = np.zeros_like(image).astype(np.uint8)
+        g = np.zeros_like(image).astype(np.uint8)
+        b = np.zeros_like(image).astype(np.uint8)
+        for l in range(0, nc):
+            idx = image == l
+            r[idx] = class_color[l, 0]
+            g[idx] = class_color[l, 1]
+            b[idx] = class_color[l, 2]
+
+        rgb = np.stack([r, g, b], axis=2)
+        if plot:
+            plt.imshow(rgb)
+        else:
+            return rgb
+
+    def plot_current_images(self, target, pred):
+        output_img = self.view_annotated(pred.detach(), class_len, False)
+        target_img = self.view_annotated(target.detach(), class_len, False)
+        error_img = (output_img == target_img).astype('uint8') # 计算误差二值图像
+        error_img[error_img > 0] = 255 # 将分类错误的像素给置为0
+        images = np.concatenate([target_img[0:2, :, :, :], output_img[0:2, :, :, :]])  # 显示前每个batch的前两张图像
+        self.vis.images(images, win='images', nrow=2, opts=dict(title='Visualization', width=600, height=900))
+        pass
 
     def plot_current_metrics(self, epoch, counter_ratio, metrics, mode='train'):
         """display the current metrics on visdom display: dictionary of error labels and values
