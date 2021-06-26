@@ -177,8 +177,8 @@ class Visualizer(object):
                 webpage.add_images(ims, txts, links, width=self.win_size)
             webpage.save()
 
-    def view_annotated(tensor, nc=class_len, plot=True):
-        image = tensor.numpy()
+    def view_annotated(self, tensor, nc=class_len, plot=True):
+        image = tensor.cpu().numpy()
         r = np.zeros_like(image).astype(np.uint8)
         g = np.zeros_like(image).astype(np.uint8)
         b = np.zeros_like(image).astype(np.uint8)
@@ -188,20 +188,23 @@ class Visualizer(object):
             g[idx] = class_color[l, 1]
             b[idx] = class_color[l, 2]
 
-        rgb = np.stack([r, g, b], axis=2)
+        rgb = np.stack([r, g, b], axis=1)
         if plot:
             plt.imshow(rgb)
         else:
             return rgb
 
-    def plot_current_images(self, target, pred):
-        output_img = self.view_annotated(pred.detach(), class_len, False)
-        target_img = self.view_annotated(target.detach(), class_len, False)
-        error_img = (output_img == target_img).astype('uint8') # 计算误差二值图像
-        error_img[error_img > 0] = 255 # 将分类错误的像素给置为0
-        images = np.concatenate([target_img[0:2, :, :, :], output_img[0:2, :, :, :]])  # 显示前每个batch的前两张图像
-        self.vis.images(images, win='images', nrow=2, opts=dict(title='Visualization', width=600, height=900))
-        pass
+    def plot_current_images(self, target, pred, mode): # 此时target,pred shape皆为 [b, h, w]
+        error_img = (pred.numpy() == target.cpu().numpy()).astype('uint8')  # 计算误差曲线
+        error_img[error_img > 0] = 255  # 将分类错误的像素给置为0 shape: [b, h, w]
+        error_img = np.stack([error_img, error_img, error_img], 1)   # shape: [b, 3, h, w]
+        output_img = self.view_annotated(pred.detach(), class_len, False)  # shape: [b, 3, h, w]
+        target_img = self.view_annotated(target.detach(), class_len, False) # shape: [b, 3, h, w]
+        # 在这里显示每个batch的前两张图像
+        images_col_1 = np.stack([target_img[0], output_img[0], error_img[0]], 0)  # shape: [1, 3, h, w] 每一行依次为target/pred/error_img
+        images_col_2 = np.stack([target_img[1], output_img[1], error_img[1]], 0)
+        images = np.concatenate([images_col_1, images_col_2])  # shape: [2, 3, h, w]
+        self.vis.images(images, win=mode + 'images', nrow=3, opts=dict(title=mode+'_Visualization', custom='GT/Pred/Error', width=900, height=600))
 
     def plot_current_metrics(self, epoch, counter_ratio, metrics, mode='train'):
         """display the current metrics on visdom display: dictionary of error labels and values

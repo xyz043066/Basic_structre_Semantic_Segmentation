@@ -137,6 +137,7 @@ class Model(object):
                 metric_dict = Metric.metric_dict
                 # visualizer.print_current_metrics(self.epoch, i, metric_dict, t_show, t_begin)
                 visualizer.plot_current_metrics(self.epoch, i/self.train_batch_sum, metric_dict, mode='train')
+                visualizer.plot_current_images(target=targets, pred=pred, mode='train')
                 F1_score, Avg_F1_score = Metric.F1_score()
                 IoU, FWIoU = Metric.Frequency_Weighted_Intersection_over_Union()
                 MIOU = Metric.Mean_Intersection_over_Union()
@@ -157,9 +158,9 @@ class Model(object):
         MIOU = Metric.Mean_Intersection_over_Union()
         F1_score, Avg_F1_score = Metric.F1_score()
         lr = self.optimizer.param_groups[0]['lr']
-        if Avg_F1_score > self.best_F1_score:
-            self.save_model(trn_loss/self.train_batch_sum, OA, MIOU, Avg_F1_score)
-            self.best_F1_score = Avg_F1_score
+        if MIOU > self.best_F1_MIOU:
+            # self.save_model(trn_loss/self.train_batch_sum, OA, MIOU, Avg_F1_score)
+            self.best_MIOU = MIOU
             print(f"The best results => epoch:{epoch}  OA:{OA}  MIOU:{MIOU}  Avg_F1_score:{Avg_F1_score} lr:{lr}")
         time_elapsed = time.time() - since
         print('Train Time {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
@@ -185,6 +186,7 @@ class Model(object):
                     metric_dict = Metric.metric_dict
                     # visualizer.print_current_metrics(self.epoch, i, metric_dict, t_show, t_begin)
                     visualizer.plot_current_metrics(self.epoch, i / self.val_batch_sum, metric_dict, mode='val')
+                    visualizer.plot_current_images(target=target, pred=pred, mode='val')
                     F1_score, Avg_F1_score = Metric.F1_score()
                     IoU, FWIoU = Metric.Frequency_Weighted_Intersection_over_Union()
                     MIOU = Metric.Mean_Intersection_over_Union()
