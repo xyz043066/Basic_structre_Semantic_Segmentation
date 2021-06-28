@@ -67,6 +67,7 @@ class Visualizer(object):
         self.name = opt.name
         self.port = opt.display_port
         self.saved = False
+        self.string = ''
         if self.display_id > 0:  # connect to a visdom server given <display_port> and <display_server>
             import visdom
             self.ncols = opt.display_ncols
@@ -310,21 +311,29 @@ class Visualizer(object):
         except VisdomExceptionBase:
             self.create_visdom_connections()
 
-    # metrics: same format as |metrics| of plot_current_metrics
-    def print_current_metrics(self, epoch, iters, metrics, t_comp, t_data):
-        """print current metrics on console; also save the metrics to the disk
+    def print_current_metrics(self, epoch, Metric):
+        MIOU = Metric.Mean_Intersection_over_Union()
+        OA = Metric.Pixel_Accuracy()
+        IOU, FWIOU = Metric.Frequency_Weighted_Intersection_over_Union()
+        F1_score, Avg_F1_score = Metric.F1_score()
+        self.string = self.string + '{' + f"'iters': {epoch}, 'OA': {OA}, 'F1_score': {Avg_F1_score}, 'MIOU': {MIOU}, 'FWIOU': {FWIOU}" + '}<br>'
+        self.vis.text(self.string, win='_Metrics')
 
-        Parameters:
-            epoch (int) -- current epoch
-            iters (int) -- current training iteration during this epoch (reset to 0 at the end of every epoch)
-            metrics (OrderedDict) -- training metrics stored in the format of (name, float) pairs
-            t_comp (float) -- computational time per data point (normalized by batch_size)
-            t_data (float) -- data loading time per data point (normalized by batch_size)
-        """
-        message = '(epoch: %d, iters: %d, time: %.3f, data: %.3f) ' % (epoch, iters, t_comp, t_data)
-        for k, v in metrics.items():
-            message += '%s: %.3f ' % (k, v)
-
-        print(message)  # print the message
-        with open(self.log_name, "a") as log_file:
-            log_file.write('%s\n' % message)  # save the message
+    # # metrics: same format as |metrics| of plot_current_metrics
+    # def print_current_metrics(self, epoch, iters, metrics, t_comp, t_data):
+    #     """print current metrics on console; also save the metrics to the disk
+    #
+    #     Parameters:
+    #         epoch (int) -- current epoch
+    #         iters (int) -- current training iteration during this epoch (reset to 0 at the end of every epoch)
+    #         metrics (OrderedDict) -- training metrics stored in the format of (name, float) pairs
+    #         t_comp (float) -- computational time per data point (normalized by batch_size)
+    #         t_data (float) -- data loading time per data point (normalized by batch_size)
+    #     """
+    #     message = '(epoch: %d, iters: %d, time: %.3f, data: %.3f) ' % (epoch, iters, t_comp, t_data)
+    #     for k, v in metrics.items():
+    #         message += '%s: %.3f ' % (k, v)
+    #
+    #     print(message)  # print the message
+    #     with open(self.log_name, "a") as log_file:
+    #         log_file.write('%s\n' % message)  # save the message
