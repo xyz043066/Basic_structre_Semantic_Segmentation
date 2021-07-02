@@ -18,24 +18,24 @@ class BaseOptions():
     def initialize(self, parser):
         """Define the common options that are used in both training and test."""
         # basic parameters
-        parser.add_argument('--dataroot', required=False, default='F:\数据集\ISPRS2D_Potsdam_Vahingen\Potsdam\Small_size\Size_256\images\\', help='path to images (should have subfolders trainA, trainB, valA, valB, etc)')
+        parser.add_argument('--dataroot', required=False, default='F:\数据集\ISPRS2D_Potsdam_Vahingen\Vahingen\Small_size\Size_256\images\\', help='path to images (should have subfolders trainA, trainB, valA, valB, etc)')
         parser.add_argument('--name', type=str, default='DeeplabV3+', help='name of the experiment. It decides where to store samples and models')
         parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
         parser.add_argument('--checkpoints_dir', type=str, default='./checkpoints', help='models are saved here')
         # model parameters
         parser.add_argument('--class_num', type=int, default=6, help='the number of feature types')
-        parser.add_argument('--model_name', type=str, default='Deeplabv3+', help='chooses which model to use. [cycle_gan | pix2pix | test | colorization]')
+        parser.add_argument('--model_name', type=str, default='HRNet', help='chooses which model to use. [cycle_gan | pix2pix | test | colorization]')
         parser.add_argument('--optimizer_name', type=str, default='adam', help='choose the optimizer')
         parser.add_argument('--criterion_name', type=str, default='CE_loss', help='choose the loss function')
         parser.add_argument('--input_nc', type=int, default=3, help='# of input image channels: 3 for RGB and 1 for grayscale')
         parser.add_argument('--output_nc', type=int, default=3, help='# of output image channels: 3 for RGB and 1 for grayscale')
         parser.add_argument('--ngf', type=int, default=64, help='# of gen filters in the last conv layer')
-        parser.add_argument('--backbone', type=str, default='resnet-18', help='choose the backbone of Deeplabv3+')
+        parser.add_argument('--backbone', type=str, default='resnet-50', help='choose the backbone of Deeplabv3+')
         parser.add_argument('--output_stride', type=int, default=16, help='set the number of output_stride of Deeplabv3+')
-
+        parser.add_argument('--hrnet_model_set', type=str, default='F:\python\My_Structure\options\seg_hrnet_ocr_vahingen.yaml')
         # dataset parameters
         parser.add_argument('--serial_batches', action='store_true', help='if true, takes images in order to make batches, otherwise takes them randomly')
-        parser.add_argument('--batch_size', type=int, default=1, help='input batch size')
+        parser.add_argument('--batch_size', type=int, default=4, help='input batch size')
         parser.add_argument('--num_workers', default=4, type=int, help='# num_workers for loading data')
         parser.add_argument('--shuffle', type=bool, default=True, help='whether loading data with shuffle or not')
         parser.add_argument('--pin_memory', type=bool, default=True, help='whether loading data with pin_memory or not')

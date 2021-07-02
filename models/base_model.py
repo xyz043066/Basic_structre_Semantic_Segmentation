@@ -6,9 +6,14 @@ import time
 import torch.optim as optim
 from models.Deeplab.deeplab import *
 from models.DenseNet.Net import *
+from models.HRNet.seg_hrnet_ocr import *
+from models.HRNet.seg_hrnet import *
 from utils.loss import *
 from utils.lr_scheduler import *
 from utils.metrics import *
+from options.config import config
+from options.config import update_config
+
 class Model(object):
     def __init__(self, opt, train_loader, val_loader):
         self.class_num = opt.class_num
@@ -31,10 +36,12 @@ class Model(object):
         self.best_F1_score = 0
         self.best_MIOU = 0
         self.epoch = 0
+        update_config(config, './options/'+opt.model_name+'.yaml')
         self._create_model()
         self._create_optimizer()
         self._create_criterion()
         self._adjust_lr()
+
 
 
     def _create_model(self):
@@ -42,6 +49,10 @@ class Model(object):
             self.model = FCDenseNet67(n_classes=self.class_num).cuda()
         elif self.model_name == 'Deeplabv3+':
             self.model =  DeepLab(num_classes=self.class_num, backbone=self.backbone, output_stride=self.output_stride).cuda()
+        elif self.model_name == 'HRNet':
+            self.model = HRNet(config).cuda()
+        elif self.model_name == "HRNet_OCR":
+            self.model = HRNet_OCR(config).cuda()
         else:
             raise NameError("Please input the proper name of used model")
 
@@ -131,22 +142,24 @@ class Model(object):
             self.scheduler(self.optimizer, i, self.epoch, MIOU)
             # Metric.update_metrics(trn_loss/i)
             # 监测模型训练情况
-            if i % self.display_freq == 0:
+            if i % 5 == 0:
+            # if i % self.display_freq == 0:
                 Metric.update_metrics(trn_loss / i)
                 t_show = time.time()
                 metric_dict = Metric.metric_dict
                 # visualizer.print_current_metrics(self.epoch, i, metric_dict, t_show, t_begin)
                 visualizer.plot_current_metrics(self.epoch, i/self.train_batch_sum, metric_dict, mode='train')
                 visualizer.plot_current_images(target=targets, pred=pred, mode='train')
+                visualizer.print_current_metrics(epoch, Metric)
                 F1_score, Avg_F1_score = Metric.F1_score()
                 IoU, FWIoU = Metric.Frequency_Weighted_Intersection_over_Union()
                 MIOU = Metric.Mean_Intersection_over_Union()
                 OA = Metric.Pixel_Accuracy_Class()
                 print("Epoch_idx:{}  batch_idx:{}/{}  Loss:{:.4f}  OA:{:.4f} F1-score:{:.4f} MIOU:{:.4f}".
                       format(self.epoch, i, self.train_batch_sum, trn_loss / i, OA, Avg_F1_score, MIOU))
-                for k in range(len(IoU)):
-                    print("Class {} => IOU:{:.4f} F1-score:{:.4f}".format(k, IoU[k], F1_score[k]))
-                print("MIOU:{:.4f}  FWIOU: {:.4f}".format(MIOU, FWIoU))
+                # for k in range(len(IoU)):
+                #     print("Class {} => IOU:{:.4f} F1-score:{:.4f}".format(k, IoU[k], F1_score[k]))
+                # print("MIOU:{:.4f}  FWIOU: {:.4f}".format(MIOU, FWIoU))
         # print('- - - - - - save {}th epoch weights - - - - - -'.format(epoch))
         # save_weights(model, optimizer, epoch, trn_loss / i, FWIoU)
         # IoU, FWIoU = Metric.Frequency_Weighted_Intersection_over_Union()
@@ -158,7 +171,7 @@ class Model(object):
         MIOU = Metric.Mean_Intersection_over_Union()
         F1_score, Avg_F1_score = Metric.F1_score()
         lr = self.optimizer.param_groups[0]['lr']
-        if MIOU > self.best_F1_MIOU:
+        if MIOU > self.best_MIOU:
             # self.save_model(trn_loss/self.train_batch_sum, OA, MIOU, Avg_F1_score)
             self.best_MIOU = MIOU
             print(f"The best results => epoch:{epoch}  OA:{OA}  MIOU:{MIOU}  Avg_F1_score:{Avg_F1_score} lr:{lr}")
