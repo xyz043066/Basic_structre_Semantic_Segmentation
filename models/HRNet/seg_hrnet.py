@@ -486,6 +486,6 @@ class HighResolutionNet(nn.Module):
 
 def HRNet(cfg, **kwargs):
     model = HighResolutionNet(cfg, **kwargs)
-    model.init_weights(cfg.MODEL.PRETRAINED)
+    # model.init_weights(cfg.MODEL.PRETRAINED)
 
     return model

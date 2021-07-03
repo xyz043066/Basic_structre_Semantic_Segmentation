@@ -36,7 +36,8 @@ class Model(object):
         self.best_F1_score = 0
         self.best_MIOU = 0
         self.epoch = 0
-        update_config(config, './options/'+opt.model_name+'.yaml')
+        if opt.model_name == 'HRNet':
+            update_config(config, './options/'+opt.model_name+'.yaml')
         self._create_model()
         self._create_optimizer()
         self._create_criterion()
@@ -206,8 +207,8 @@ class Model(object):
                     OA = Metric.Pixel_Accuracy_Class()
                     print("Epoch_idx:{}  batch_idx:{}/{}  Loss:{:.4f}  OA:{:.4f} F1-score:{:.4f} MIOU:{:.4f}".
                           format(self.epoch, i, self.val_batch_sum, val_loss / i, OA, Avg_F1_score, MIOU))
-                    for k in range(len(IoU)):
-                        print("Class {} => IOU:{:.4f} F1-score:{:.4f}".format(k, IoU[k], F1_score[k]))
-                    print("MIOU:{:.4f}  FWIOU: {:.4f}".format(MIOU, FWIoU))
+                    # for k in range(len(IoU)):
+                    #     print("Class {} => IOU:{:.4f} F1-score:{:.4f}".format(k, IoU[k], F1_score[k]))
+                    # print("MIOU:{:.4f}  FWIOU: {:.4f}".format(MIOU, FWIoU))
         time_elapsed = time.time() - since
         print('val Time {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))

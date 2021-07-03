@@ -24,6 +24,8 @@ def main():
     # device = torch.device('cuda')
     train_loader = My_dataloader(opt_train)
     val_loader = My_dataloader(opt_val)
+    # dataset = val_loader.dataset
+    # img_list = dataset.images_list
     model = Model(opt_train, train_loader, val_loader)
     #-------------显示数据集信息-----------------
 

@@ -6,7 +6,9 @@ from models.Deeplab.sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
 class Decoder(nn.Module):
     def __init__(self, num_classes, backbone, BatchNorm):
         super(Decoder, self).__init__()
-        if backbone == 'resnet-101' or backbone == 'resnet-50' or backbone == 'drn':
+
+        if backbone == 'resnet-101' or backbone == 'resnet-50' or backbone == 'drn' or 'res2net101_26w_4s'\
+                or 'res2net50_26w_4s' or 'res2net50_26w_6s' or 'res2net50_26w_8s' or 'res2net50_18w_8s' or 'res2net50_48w_2s':
             low_level_inplanes = 256
         elif backbone == 'xception':
             low_level_inplanes = 128
@@ -51,7 +53,7 @@ class Decoder(nn.Module):
         # print("low_level_feat size =", low_level_feat.size(), "x size = ", x.size())
         # exit()
 
-        x = self.feature_fusion_module(low_level_feat, x )
+        x = self.feature_fusion_module(low_level_feat, x)
         x = self.final_conv(x)
 
         return x

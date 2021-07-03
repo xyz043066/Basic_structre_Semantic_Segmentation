@@ -2,7 +2,7 @@ import visdom
 import numpy as np
 import time
 import torch
-viz = visdom.Visdom(env='test1')
+viz = visdom.Visdom(env='demo_demo_1')
 # 单张/多张图像显示与更新demo
 image = viz.image(np.random.rand(3, 256, 256), win='img')
 for i in range(10):
@@ -29,3 +29,4 @@ viz.line(
               xlabel='time',
               ylabel='Volume')
 )
+viz.text('Hello,world', win='Text')

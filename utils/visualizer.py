@@ -205,7 +205,10 @@ class Visualizer(object):
         images_col_1 = np.stack([target_img[0], output_img[0], error_img[0]], 0)  # shape: [1, 3, h, w] 每一行依次为target/pred/error_img
         images_col_2 = np.stack([target_img[1], output_img[1], error_img[1]], 0)
         images = np.concatenate([images_col_1, images_col_2])  # shape: [2, 3, h, w]
-        self.vis.images(images, win=mode + 'images', nrow=3, opts=dict(title=mode+'_Visualization', custom='GT/Pred/Error', width=900, height=600))
+        # self.vis.images(images_col_1, win=mode + 'images1', nrow=3, opts=dict(title=mode + '_Visualization'))
+        # self.vis.images(images_col_2, win=mode + 'images2', nrow=3, opts=dict(title=mode + '_Visualization'))
+        self.vis.images(images, win=mode + 'images', nrow=3, opts=dict(title=mode+'_Visualization', width=900, height=600))
+        # self.vis.images(images, win=mode + 'images', nrow=3, opts=dict(title=mode + '_Visualization'))
 
     def plot_current_metrics(self, epoch, counter_ratio, metrics, mode='train'):
         """display the current metrics on visdom display: dictionary of error labels and values
