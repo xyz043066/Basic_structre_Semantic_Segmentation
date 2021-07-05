@@ -83,6 +83,7 @@ class ASPP(nn.Module):
 
 
         # x5 = self.global_avg_pool(x)
+        # x5 = F.interpolate(x5, size=x4.size()[2:], mode='bilinear', align_corners=True)
         # print("x5 size = ", x5.size())
         
         # x5 = F.interpolate(x5, size=x4.size()[2:], mode='bilinear', align_corners=True)

@@ -55,6 +55,8 @@ class Decoder(nn.Module):
 
         x = self.feature_fusion_module(low_level_feat, x)
         x = self.final_conv(x)
+        # x = torch.cat((x, low_level_feat), dim=1)
+        # x = self.last_conv(x)
 
         return x
 

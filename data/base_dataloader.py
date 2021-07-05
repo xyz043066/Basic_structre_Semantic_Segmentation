@@ -42,10 +42,14 @@ class MyDataSet(data.Dataset):
         # 通过img_path的md5值对img_path进行排序
         images_list = self.get_img_hash_dict(images_list)
         self.images_len = len(images_list)
+        # if self.train:
+        #     self.images_list = images_list[:int(0.8*self.images_len)]
+        # else:
+        #     self.images_list = images_list[int(0.8*self.images_len):]
         if self.train:
-            self.images_list = images_list[:int(0.8*self.images_len)]
+            self.images_list = images_list[int(0.25*self.images_len):]
         else:
-            self.images_list = images_list[int(0.8*self.images_len):]
+            self.images_list = images_list[:int(0.25*self.images_len)]
         # normalize = transforms.Normalize(mean=mean, std=std)
         if self.is_transform:
             self.transform = transforms.Compose([
