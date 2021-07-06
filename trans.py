@@ -28,7 +28,7 @@ Background = [255, 0, 0]
 class_color = np.array([Imper_Surfaces, Building, Low_Vegetation, Tree, Car, Background])
 # classes = [0, 255]
 class_len = len(classes)
-img_dir = "F:\数据集\ISPRS2D_Potsdam_Vahingen\Vahingen\Small_size\Size_256\labels\\"
+img_dir = "F:\数据集\ISPRS2D_Potsdam_Vahingen\Vahingen\Small_size\Size_256\\train\labels\\"
 img_ids = os.listdir(img_dir)
 len = len(img_ids)
 img_list = []
@@ -53,10 +53,10 @@ for image_id in img_ids:
 # img_path_2 = img_path.replace('labels', 'GTs')
 # GT_label = np.asarray(Image.open(img_path_2))
 # plt.figure()
-plt.subplot(1, 2, 1)
-plt.imshow(img)
-plt.subplot(1, 2, 2)
-plt.imshow(GT_label)
-# GT_label.show()
-plt.show()
+# plt.subplot(1, 2, 1)
+# plt.imshow(img)
+# plt.subplot(1, 2, 2)
+# plt.imshow(GT_label)
+# # GT_label.show()
+# plt.show()
 

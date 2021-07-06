@@ -29,27 +29,46 @@ class_len = len(class_color)
 # std = [0.27413549931506, 0.28506257482912, 0.28284674400252]
 class MyDataSet(data.Dataset):
     def __init__(self, opt):
-        self.train = opt.isTrain
-        self.images_dir = opt.dataroot
-        self.is_transform = opt.transform
-        self.ids = os.listdir(self.images_dir)
+        # self.train = opt.isTrain
+        # self.images_dir = opt.dataroot
+        # self.is_transform = opt.transform
+        # self.ids = os.listdir(self.images_dir)
         # 读取数据集中各图像路径
-        images_list = []
-        for image_id in self.ids:
-            if os.path.isfile(os.path.join(self.images_dir, image_id)):
-                file_name, _ = os.path.splitext(image_id)
-                images_list.append(self.images_dir + file_name + ".png")
+        # images_list = []
+        # for image_id in self.ids:
+        #     if os.path.isfile(os.path.join(self.images_dir, image_id)):
+        #         file_name, _ = os.path.splitext(image_id)
+        #         images_list.append(self.images_dir + file_name + ".png")
         # 通过img_path的md5值对img_path进行排序
-        images_list = self.get_img_hash_dict(images_list)
-        self.images_len = len(images_list)
+        # images_list = self.get_img_hash_dict(images_list)
+        # self.images_len = len(images_list)
         # if self.train:
         #     self.images_list = images_list[:int(0.8*self.images_len)]
         # else:
         #     self.images_list = images_list[int(0.8*self.images_len):]
+        # if self.train:
+        #     self.images_list = images_list[int(0.25*self.images_len):]
+        # else:
+        #     self.images_list = images_list[:int(0.25*self.images_len)]
+        self.train = opt.isTrain
+        self.images_dir_train = opt.dataroot
+        self.images_dir_val = self.images_dir_train.replace('train', 'val')
+        self.is_transform = opt.transform
+        self.ids = os.listdir(self.images_dir_train)
+        images_list_train = []
+        for image_id in self.ids:
+            if os.path.isfile(os.path.join(self.images_dir_train, image_id)):
+                file_name, _ = os.path.splitext(image_id)
+                images_list_train.append(self.images_dir_train + file_name + ".png")
+        images_list_val = []
+        for image_id in self.ids:
+            if os.path.isfile(os.path.join(self.images_dir_val, image_id)):
+                file_name, _ = os.path.splitext(image_id)
+                images_list_val.append(self.images_dir_val + file_name + ".png")
         if self.train:
-            self.images_list = images_list[int(0.25*self.images_len):]
+            self.images_list = images_list_train
         else:
-            self.images_list = images_list[:int(0.25*self.images_len)]
+            self.images_list = images_list_val
         # normalize = transforms.Normalize(mean=mean, std=std)
         if self.is_transform:
             self.transform = transforms.Compose([

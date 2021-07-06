@@ -8,6 +8,8 @@ from models.Deeplab.deeplab import *
 from models.DenseNet.Net import *
 from models.HRNet.seg_hrnet_ocr import *
 from models.HRNet.seg_hrnet import *
+from models.FCN.FCNs import *
+from models.UNet.Unet import *
 from utils.loss import *
 from utils.lr_scheduler import *
 from utils.metrics import *
@@ -54,6 +56,10 @@ class Model(object):
             self.model = HRNet(config).cuda()
         elif self.model_name == "HRNet_OCR":
             self.model = HRNet_OCR(config).cuda()
+        elif self.model_name == 'FCNs':
+            self.model = FCNs(n_class=self.class_num).cuda()
+        elif self.model_name == 'UNet':
+            self.model = ResNetUNet(n_class=self.class_num).cuda()
         else:
             raise NameError("Please input the proper name of used model")
 
