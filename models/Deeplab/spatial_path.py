@@ -3,6 +3,7 @@ import warnings
 
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 warnings.filterwarnings(action='ignore')
 
@@ -49,6 +50,34 @@ class AttentionRefinementModule(torch.nn.Module):
         # channels of input and x should be same
         x = torch.mul(input, x)
         return x
+
+
+class AttentionFusionModule(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.in_channels = in_channels
+        self.convblock_1 = ConvBlock(in_channels=self.in_channels, out_channels=256, kernel_size=1, stride=1, padding=0)
+        # self.sigmoid = nn.Sigmoid()
+        self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
+        self.softmax = nn.Softmax()
+        # self.avgpool = nn.AdaptiveAvgPool2d(output=(1, 1))
+        self.convblock_2 = ConvBlock(in_channels=256, out_channels=out_channels, kernel_size=3, stride=1, padding=1)
+
+    def forward(self, input, low_feature_map):
+        low_feature_map = self.convblock_1(low_feature_map)
+        feasure = self.avgpool(low_feature_map)
+        feasure = self.softmax(feasure)
+        feasure = torch.mul(feasure, low_feature_map)
+        x = F.interpolate(input, size=low_feature_map.size()[2:], mode='bilinear', align_corners=True)
+        x = torch.add(x, feasure) # the channels between x and feature must be same
+        x = self.convblock_2(x)
+
+        return x
+
+
+
+
+
 
 
 class FeatureFusionModule(torch.nn.Module):

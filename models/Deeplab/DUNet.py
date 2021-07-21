@@ -3,16 +3,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 from models.Deeplab.aspp import build_aspp
 from models.Deeplab.backbone import build_backbone
-from models.Deeplab.decoder import build_decoder
+from models.Deeplab.DUNet_decoder import build_decoder
 from models.Deeplab.sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
 
 
 # from models.spatial_path import *
 
-class DeepLab(nn.Module):
+class DUNet(nn.Module):
     def __init__(self, backbone='resnet-18', output_stride=16, num_classes=21,
                  sync_bn=True, freeze_bn=False):
-        super(DeepLab, self).__init__()
+        super(DUNet, self).__init__()
         if backbone == 'drn':
             output_stride = 8
 
@@ -29,9 +29,9 @@ class DeepLab(nn.Module):
             self.freeze_bn()
 
     def forward(self, input):
-        x, low_level_feat, _ = self.backbone(input)
+        x, low_level_feat_1, low_level_feat_2 = self.backbone(input)
         x = self.aspp(x)
-        x = self.decoder(x, low_level_feat)
+        x = self.decoder(x, low_level_feat_1, low_level_feat_2)
         x = F.interpolate(x, size=input.size()[2:], mode='bilinear', align_corners=True)
 
         return x
@@ -65,7 +65,7 @@ class DeepLab(nn.Module):
 
 
 if __name__ == "__main__":
-    model = DeepLab(backbone='resnet-18', output_stride=16)
+    model = DUNet(backbone='resnet-18', output_stride=16)
     print(model)
     model.eval()
     input = torch.rand(1, 3, 513, 513)

@@ -187,14 +187,16 @@ class ResNet(nn.Module):
         x = self.maxpool(x)
 
         x = self.layer1(x)
-        low_level_feat = x # 原版
+        low_level_feat_1 = x # 原版
         x = self.layer2(x)
+        # low_level_feat_2 = x
         # low_level_feat = x
         # print(low_level_feat_layer1.size() , low_level_feat_layer2.size() )
         # low_level_feat = self.aspp_low_level_conv(low_level_feat)
         x = self.layer3(x)
+        low_level_feat_2 = x
         x = self.layer4(x)
-        return x, low_level_feat
+        return x, low_level_feat_1, low_level_feat_2
 
     def _init_weight(self):
         for m in self.modules():

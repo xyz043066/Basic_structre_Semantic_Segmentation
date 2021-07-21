@@ -5,14 +5,14 @@ from models.Deeplab.aspp import build_aspp
 from models.Deeplab.backbone import build_backbone
 from models.Deeplab.decoder import build_decoder
 from models.Deeplab.sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
-
+from models.HRNet.seg_hrnet_ocr import *
 
 # from models.spatial_path import *
 
-class DeepLab(nn.Module):
+class DeepLab_OCR(nn.Module):
     def __init__(self, backbone='resnet-18', output_stride=16, num_classes=21,
                  sync_bn=True, freeze_bn=False):
-        super(DeepLab, self).__init__()
+        super(DeepLab_OCR, self).__init__()
         if backbone == 'drn':
             output_stride = 8
 
@@ -23,14 +23,52 @@ class DeepLab(nn.Module):
 
         self.backbone = build_backbone(backbone, output_stride, BatchNorm)
         self.aspp = build_aspp(backbone, output_stride, BatchNorm)
+        last_inp_channels = 1024
+        ocr_mid_channels = 512
+        ocr_key_channels = 256
+
+        self.conv3x3_ocr = nn.Sequential(
+            nn.Conv2d(ocr_key_channels, ocr_mid_channels,
+                      kernel_size=3, stride=1, padding=1),
+            BatchNorm2d(ocr_mid_channels),
+            nn.ReLU(inplace=relu_inplace),
+        )
+        self.ocr_gather_head = SpatialGather_Module(num_classes)
+
+        self.ocr_distri_head = SpatialOCR_Module(in_channels=ocr_mid_channels,
+                                                 key_channels=ocr_key_channels,
+                                                 out_channels=ocr_mid_channels,
+                                                 scale=1,
+                                                 dropout=0.05,
+                                                 )
+        self.cls_head = nn.Conv2d(
+            ocr_mid_channels, ocr_key_channels, kernel_size=1, stride=1, padding=0, bias=True)
+
+        self.aux_head = nn.Sequential(
+            nn.Conv2d(last_inp_channels, last_inp_channels,
+                      kernel_size=1, stride=1, padding=0),
+            BatchNorm2d(last_inp_channels),
+            nn.ReLU(inplace=relu_inplace),
+            nn.Conv2d(last_inp_channels, num_classes,
+                      kernel_size=1, stride=1, padding=0, bias=True)
+        )
         self.decoder = build_decoder(num_classes, backbone, BatchNorm)
 
         if freeze_bn:
             self.freeze_bn()
 
     def forward(self, input):
-        x, low_level_feat, _ = self.backbone(input)
+        x, low_level_feat, feats = self.backbone(input)
         x = self.aspp(x)
+        # ocr
+        out_aux = self.aux_head(feats)
+        # compute contrast feature
+        x = self.conv3x3_ocr(x)
+
+        context = self.ocr_gather_head(x, out_aux)
+        x = self.ocr_distri_head(x, context)
+
+        x = self.cls_head(x)
         x = self.decoder(x, low_level_feat)
         x = F.interpolate(x, size=input.size()[2:], mode='bilinear', align_corners=True)
 
@@ -65,7 +103,7 @@ class DeepLab(nn.Module):
 
 
 if __name__ == "__main__":
-    model = DeepLab(backbone='resnet-18', output_stride=16)
+    model = DeepLab_OCR(backbone='resnet-18', output_stride=16)
     print(model)
     model.eval()
     input = torch.rand(1, 3, 513, 513)
