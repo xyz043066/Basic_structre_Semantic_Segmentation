@@ -18,17 +18,18 @@ def LabelToLongTensor(label):
     return GT_label
 # 定义地物类型
 classes = ['impervious surfaces', 'building',
-           'low vegetation', 'tree', 'car', 'clutter']
+           'low vegetation', 'tree', 'car', 'clutter', 'boundary']
 Imper_Surfaces = [255, 255, 255]
 Building = [0, 0, 255]
 Low_Vegetation = [0, 255, 255]
 Tree = [0, 255, 0]
 Car = [255, 255, 0]
 Background = [255, 0, 0]
-class_color = np.array([Imper_Surfaces, Building, Low_Vegetation, Tree, Car, Background])
+boundary = [0, 0, 0]
+class_color = np.array([Imper_Surfaces, Building, Low_Vegetation, Tree, Car, Background, boundary])
 # classes = [0, 255]
 class_len = len(classes)
-img_dir = "F:\数据集\ISPRS2D_Potsdam_Vahingen\Vahingen\Small_size\Size_256\\train\labels\\"
+img_dir = "F:\数据集\ISPRS2D_Potsdam_Vahingen\Potsdam\Small_size\Size_512\\test\\labels\\"
 img_ids = os.listdir(img_dir)
 len = len(img_ids)
 img_list = []
@@ -45,8 +46,9 @@ for image_id in img_ids:
         # cv.imwrite(img_path_2, GT_label)
         GT_label = Image.fromarray(GT_label)
         GT_label.save(img_path_2)
-        if i % 50 == 0:
-            print(f"Save the {i}/{len} succefully!")
+        print(f"Save the {i}.png successfully!")
+        # if i % 50 == 0:
+        #     print(f"Save the {i}/{len} succefully!")
         i = i + 1
 # img_path = img_dir + "1.png"
 # img = np.asarray(Image.open(img_path))
