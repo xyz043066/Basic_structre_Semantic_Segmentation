@@ -5,19 +5,28 @@ import torch.nn as nn
 import time
 import torch.optim as optim
 from models.Deeplab.deeplab import *
+from models.Deeplab.DUNet import *
+from models.Deeplab.MSNet import *
+from models.Deeplab.AFNet import *
+from models.Deeplab.HMANet import *
+from models.Deeplab.deeplab_ocr import *
 from models.DenseNet.Net import *
 from models.HRNet.seg_hrnet_ocr import *
 from models.HRNet.seg_hrnet import *
 from models.FCN.FCNs import *
 from models.UNet.Unet import *
+from models.PSPNet.pspnet import *
 from utils.loss import *
 from utils.lr_scheduler import *
 from utils.metrics import *
 from options.config import config
 from options.config import update_config
 
+
 class Model(object):
     def __init__(self, opt, train_loader, val_loader):
+        os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu_ids
+        # self.device = torch.device('cuda:' + str(opt.gpu_ids[0]))
         self.class_num = opt.class_num
         self.lr = opt.lr
         self.lr_policy = opt.lr_policy
@@ -36,15 +45,17 @@ class Model(object):
         self.train_batch_sum = len(self.train_loader)
         self.val_batch_sum = len(self.val_loader)
         self.best_F1_score = 0
+        self.best_OA = 0
         self.best_MIOU = 0
         self.epoch = 0
-        if opt.model_name == 'HRNet':
-            update_config(config, './options/'+opt.model_name+'.yaml')
+        # update_config(config, opt.hrnet_model_set)
         self._create_model()
         self._create_optimizer()
         self._create_criterion()
+        # if self.optimizer_name != 'adam':
         self._adjust_lr()
-
+        if opt.fpath:
+            self.epoch = self.load_model(opt.fpath)
 
 
     def _create_model(self):
@@ -52,8 +63,20 @@ class Model(object):
             self.model = FCDenseNet67(n_classes=self.class_num).cuda()
         elif self.model_name == 'Deeplabv3+':
             self.model =  DeepLab(num_classes=self.class_num, backbone=self.backbone, output_stride=self.output_stride).cuda()
+        elif self.model_name == 'OCRNet':
+            self.model =  DeepLab_OCR(num_classes=self.class_num, backbone=self.backbone, output_stride=self.output_stride).cuda()
+        elif self.model_name == 'DUNet':
+            self.model =  DUNet(num_classes=self.class_num, backbone=self.backbone, output_stride=self.output_stride).cuda()
+        elif self.model_name == 'MSNet':
+            self.model =  MSNet(num_classes=self.class_num, backbone=self.backbone, output_stride=self.output_stride).cuda()
+        elif self.model_name == 'AFNet':
+            self.model = AFNet(num_classes=self.class_num, backbone=self.backbone, output_stride=self.output_stride).cuda()
+        elif self.model_name == 'HMANet':
+            self.model = HMANet(num_classes=self.class_num, backbone=self.backbone, output_stride=self.output_stride).cuda()
         elif self.model_name == 'HRNet':
             self.model = HRNet(config).cuda()
+        elif self.model_name == 'PSPNet':
+            self.model = PSPNet(num_classes=self.class_num, backbone=self.backbone).cuda()
         elif self.model_name == "HRNet_OCR":
             self.model = HRNet_OCR(config).cuda()
         elif self.model_name == 'FCNs':
@@ -80,12 +103,12 @@ class Model(object):
         else:
             raise NameError("Please input the proper name of used criterion")
 
-    def save_model(self, loss, OA, MIOU, F1_score):
-        WEIGHTS_PATH = os.path.join(self.checkpoints_dir, self.model_name)
-        weights_fname = 'weights-%d--loss_%.4f--OA_%.4f--MIOU_%.4f--F1_score_%.4f.pth' % (self.epoch, loss, OA, MIOU, F1_score)
+    def save_model(self, epoch, loss, OA, MIOU, F1_score):
+        WEIGHTS_PATH = self.checkpoints_dir
+        weights_fname = 'weights-%d--loss_%.4f--OA_%.4f--MIOU_%.4f--F1_score_%.4f.pth' % (epoch, loss, OA, MIOU, F1_score)
         weights_fpath = os.path.join(WEIGHTS_PATH, weights_fname)
         torch.save({
-            'startEpoch': self.epoch,
+            'startEpoch': epoch,
             'loss': loss,
             'OA': OA,
             'MIOU': MIOU,
@@ -124,7 +147,7 @@ class Model(object):
 
     # 模型训练
     def train(self, Metric, visualizer, epoch):
-        self.epoch = epoch
+        # self.epoch = self.epoch + epoch
         self.model.train()
         Metric.reset()
         # train_batch_sum = len(self.train_loader)
@@ -146,27 +169,34 @@ class Model(object):
             pred = self.get_prediction(output)
             Metric.add_batch(targets.cpu().numpy().astype(int), pred.cpu().numpy().astype(int))
             MIOU = Metric.Mean_Intersection_over_Union()
-            self.scheduler(self.optimizer, i, self.epoch, MIOU)
+            self.scheduler(self.optimizer, i, epoch, MIOU)
             # Metric.update_metrics(trn_loss/i)
             # 监测模型训练情况
-            if i % 5 == 0:
-            # if i % self.display_freq == 0:
+            if i % (self.train_batch_sum//50) == 0:
                 Metric.update_metrics(trn_loss / i)
                 t_show = time.time()
                 metric_dict = Metric.metric_dict
                 # visualizer.print_current_metrics(self.epoch, i, metric_dict, t_show, t_begin)
-                visualizer.plot_current_metrics(self.epoch, i/self.train_batch_sum, metric_dict, mode='train')
+                visualizer.plot_current_metrics(epoch, i/self.train_batch_sum, metric_dict, mode='train')
                 visualizer.plot_current_images(target=targets, pred=pred, mode='train')
-                visualizer.print_current_metrics(epoch, Metric)
                 F1_score, Avg_F1_score = Metric.F1_score()
                 IoU, FWIoU = Metric.Frequency_Weighted_Intersection_over_Union()
                 MIOU = Metric.Mean_Intersection_over_Union()
-                OA = Metric.Pixel_Accuracy_Class()
-                print("Epoch_idx:{}  batch_idx:{}/{}  Loss:{:.4f}  OA:{:.4f} F1-score:{:.4f} MIOU:{:.4f}".
-                      format(self.epoch, i, self.train_batch_sum, trn_loss / i, OA, Avg_F1_score, MIOU))
+                OA = Metric.Pixel_Accuracy()
+                print("Epoch_idx:{}  batch_idx:{}/{}  Loss:{:.4f}  OA:{:.4f} Avg_F1-score:{:.4f} MIOU:{:.4f} FWIOU:{:.4f}".
+                      format(self.epoch + epoch, i, self.train_batch_sum, trn_loss / i, OA, Avg_F1_score, MIOU, FWIoU))
                 # for k in range(len(IoU)):
                 #     print("Class {} => IOU:{:.4f} F1-score:{:.4f}".format(k, IoU[k], F1_score[k]))
                 # print("MIOU:{:.4f}  FWIOU: {:.4f}".format(MIOU, FWIoU))
+        F1_score, Avg_F1_score = Metric.F1_score()
+        IoU, FWIoU = Metric.Frequency_Weighted_Intersection_over_Union()
+        MIOU = Metric.Mean_Intersection_over_Union()
+        OA = Metric.Pixel_Accuracy()
+        print("Epoch_idx:{}  Loss:{:.4f}  OA:{:.4f} Avg_F1-score:{:.4f} MIOU:{:.4f} FWIOU:{:.4f} ".
+              format(self.epoch + epoch, trn_loss / i, OA, Avg_F1_score, MIOU, FWIoU))
+        # for k in range(len(IoU)):
+        #     print("Class {} => IOU:{:.4f} F1-score:{:.4f}".format(k, IoU[k], F1_score[k]))
+        # print("MIOU:{:.4f}  FWIOU: {:.4f}".format(MIOU, FWIoU))
         # print('- - - - - - save {}th epoch weights - - - - - -'.format(epoch))
         # save_weights(model, optimizer, epoch, trn_loss / i, FWIoU)
         # IoU, FWIoU = Metric.Frequency_Weighted_Intersection_over_Union()
@@ -174,19 +204,21 @@ class Model(object):
         #     print("The {}th epoch IOU:Class {} => {:.4f}".format(self.epoch, k, IoU[k]))
         # print("The {}th epoch FWIOU: {:.4f}".format(self.epoch, FWIoU))
         # trn_loss /= len(self.train_loader)
-        OA = Metric.Pixel_Accuracy_Class()
-        MIOU = Metric.Mean_Intersection_over_Union()
-        F1_score, Avg_F1_score = Metric.F1_score()
-        lr = self.optimizer.param_groups[0]['lr']
-        if MIOU > self.best_MIOU:
-            # self.save_model(trn_loss/self.train_batch_sum, OA, MIOU, Avg_F1_score)
-            self.best_MIOU = MIOU
-            print(f"The best results => epoch:{epoch}  OA:{OA}  MIOU:{MIOU}  Avg_F1_score:{Avg_F1_score} lr:{lr}")
+        # OA = Metric.Pixel_Accuracy_Class()
+        # MIOU = Metric.Mean_Intersection_over_Union()
+        # F1_score, Avg_F1_score = Metric.F1_score()
+        # lr = self.optimizer.param_groups[0]['lr']
+        # if Avg_F1_score > self.best_F1_score:
+        #     if self.epoch % 5 == 0
+        #         self.save_model(trn_loss/self.train_batch_sum, OA, MIOU, Avg_F1_score)
+        #     self.best_F1_score = Avg_F1_score
+        #     print(f"The best results =>  epoch:{epoch}   OA:{OA}   MIOU:{MIOU}   Avg_F1_score:{Avg_F1_score}   lr:{lr}")
         time_elapsed = time.time() - since
         print('Train Time {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
 
     def val(self, Metric, visualizer, epoch):
-        self.epoch = epoch
+        # self.epoch = self.epoch + epoch
+        Metric.reset()
         self.model.eval()
         since = time.time()
         i = 0
@@ -200,21 +232,55 @@ class Model(object):
                 val_loss += self.criterion(output, target).item()
                 pred = self.get_prediction(output)
                 Metric.add_batch(target.cpu().numpy().astype(int), pred.cpu().numpy().astype(int))
-                if i % self.display_freq == 0:
+                if i % (self.val_batch_sum//4) == 0:
                     Metric.update_metrics(val_loss / i)
                     t_show = time.time()
                     metric_dict = Metric.metric_dict
                     # visualizer.print_current_metrics(self.epoch, i, metric_dict, t_show, t_begin)
-                    visualizer.plot_current_metrics(self.epoch, i / self.val_batch_sum, metric_dict, mode='val')
-                    visualizer.plot_current_images(target=target, pred=pred, mode='val')
+                    visualizer.plot_current_metrics(epoch, i / self.val_batch_sum, metric_dict, mode='test')
+                    visualizer.plot_current_images(target=target, pred=pred, mode='test')
                     F1_score, Avg_F1_score = Metric.F1_score()
                     IoU, FWIoU = Metric.Frequency_Weighted_Intersection_over_Union()
                     MIOU = Metric.Mean_Intersection_over_Union()
-                    OA = Metric.Pixel_Accuracy_Class()
-                    print("Epoch_idx:{}  batch_idx:{}/{}  Loss:{:.4f}  OA:{:.4f} F1-score:{:.4f} MIOU:{:.4f}".
-                          format(self.epoch, i, self.val_batch_sum, val_loss / i, OA, Avg_F1_score, MIOU))
+                    OA = Metric.Pixel_Accuracy()
+                    print("Epoch_idx:{}  batch_idx:{}/{}  Loss:{:.4f}  OA:{:.4f} Avg_F1-score:{:.4f} MIOU:{:.4f} FWIoU:{:.4f}".
+                          format(self.epoch+epoch, i, self.val_batch_sum, val_loss / i, OA, Avg_F1_score, MIOU, FWIoU))
                     # for k in range(len(IoU)):
                     #     print("Class {} => IOU:{:.4f} F1-score:{:.4f}".format(k, IoU[k], F1_score[k]))
                     # print("MIOU:{:.4f}  FWIOU: {:.4f}".format(MIOU, FWIoU))
+        visualizer.print_current_metrics(epoch, Metric)
+        F1_score, Avg_F1_score = Metric.F1_score()
+        IoU, FWIoU = Metric.Frequency_Weighted_Intersection_over_Union()
+        MIOU = Metric.Mean_Intersection_over_Union()
+        OA = Metric.Pixel_Accuracy()
+        print("Epoch_idx:{}  Loss:{:.4f}  OA:{:.4f} Avg_F1-score:{:.4f} MIOU:{:.4f} FWIOU:{:.4f} ".
+              format(self.epoch+epoch, val_loss / i, OA, Avg_F1_score, MIOU, FWIoU))
+        lr = self.optimizer.param_groups[0]['lr']
+        if MIOU > self.best_MIOU:
+            if(epoch < (self.n_epochs//10)) and (MIOU - self.best_MIOU > 0.003):
+                self.save_model(self.epoch+epoch, val_loss/self.val_batch_sum, OA, MIOU, Avg_F1_score)
+                self.best_MIOU = MIOU
+                print(f"The best results =>  epoch:{self.epoch + epoch}   OA:{OA}   MIOU:{MIOU}   Avg_F1_score:{Avg_F1_score}   FWIoU:{FWIoU} lr:{lr}")
+                print("The confusion matrix:\n", Metric.confusion_matrix)
+            elif (epoch > (self.n_epochs//10)) and (epoch < (self.n_epochs//8)) and (MIOU - self.best_MIOU > 0.001):
+                self.save_model(self.epoch+epoch, val_loss / self.val_batch_sum, OA, MIOU, Avg_F1_score)
+                self.best_MIOU = MIOU
+                print(f"The best results =>  epoch:{self.epoch + epoch}   OA:{OA}   MIOU:{MIOU}   Avg_F1_score:{Avg_F1_score}  FWIoU:{FWIoU}  lr:{lr}")
+                print("The confusion matrix:\n", Metric.confusion_matrix)
+            elif (epoch > (self.n_epochs//8)) and (epoch < (self.n_epochs//4)) and (MIOU - self.best_MIOU > 0.0003):
+                self.save_model(self.epoch+epoch, val_loss / self.val_batch_sum, OA, MIOU, Avg_F1_score)
+                self.best_MIOU = MIOU
+                print(f"The best results =>  epoch:{self.epoch + epoch}   OA:{OA}   MIOU:{MIOU}   Avg_F1_score:{Avg_F1_score}  FWIoU:{FWIoU} lr:{lr}")
+                print("The confusion matrix:\n", Metric.confusion_matrix)
+            elif epoch > (self.n_epochs // 4):
+                self.save_model(self.epoch+epoch, val_loss / self.val_batch_sum, OA, MIOU, Avg_F1_score)
+                self.best_MIOU = MIOU
+                print(f"The best results =>  epoch:{self.epoch + epoch}   OA:{OA}   MIOU:{MIOU}   Avg_F1_score:{Avg_F1_score}  FWIoU:{FWIoU} lr:{lr}")
+                print("The confusion matrix:\n", Metric.confusion_matrix)
+            # self.best_F1_score = Avg_F1_score
+            # print(f"The best results =>  epoch:{self.epoch+epoch}   OA:{Avg_OA}   MIOU:{MIOU}   Avg_F1_score:{Avg_F1_score}   lr:{lr}")
+            # print("The confusion matrix:\n", Metric.confusion_matrix)
+        if epoch == self.n_epochs - 1:
+            self.save_model(self.epoch+epoch, val_loss / self.val_batch_sum, OA, MIOU, Avg_F1_score)
         time_elapsed = time.time() - since
         print('val Time {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))

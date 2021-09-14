@@ -1,6 +1,5 @@
 from models.Deeplab.spatial_path import *
 from models.Deeplab.sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
-import torch.nn.functional as F
 
 
 class _ASPPModule(nn.Module):
@@ -32,18 +31,18 @@ class _ASPPModule(nn.Module):
 
 
 class ASPP(nn.Module):
-    def __init__(self, backbone, output_stride, BatchNorm, inplanes=2048):
+    def __init__(self, backbone, output_stride, BatchNorm):
         super(ASPP, self).__init__()
-        # if backbone == 'drn':
-        #     inplanes = 512
-        # elif backbone == 'mobilenet':
-        #     inplanes = 320
-        # elif backbone == 'resnet-18' or backbone == 'resnet-34':
-        #     inplanes = 512
-        # else:
-        #     inplanes = 2048
+        if backbone == 'drn':
+            inplanes = 512
+        elif backbone == 'mobilenet':
+            inplanes = 320
+        elif backbone == 'resnet-18' or backbone == 'resnet-34':
+            inplanes = 512
+        else:
+            inplanes = 2048
         if output_stride == 16:
-            dilations = [1, 6, 12, 18]  # [1, 6, 12, 18]
+            dilations = [1, 3, 12, 18]  # [1, 6, 12, 18]
             # dilations = [1, 3, 3, 18]
         elif output_stride == 8:
             dilations = [1, 3, 6, 9]  # [1, 12, 24, 36]
@@ -54,16 +53,20 @@ class ASPP(nn.Module):
         self.aspp2 = _ASPPModule(inplanes, 256, 3, padding=dilations[1], dilation=dilations[1], BatchNorm=BatchNorm)
         self.aspp3 = _ASPPModule(inplanes, 256, 3, padding=dilations[2], dilation=dilations[2], BatchNorm=BatchNorm)
         self.aspp4 = _ASPPModule(inplanes, 256, 3, padding=dilations[3], dilation=dilations[3], BatchNorm=BatchNorm)
-
+        self.slam1 = SLAM(channels=256)
+        self.slam2 = SLAM(channels=256)
+        self.slam3 = SLAM(channels=256)
+        self.slam4 = SLAM(channels=256)
+        self.slam5 = SLAM(channels=256)
         self.global_avg_pool = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
                                              nn.Conv2d(inplanes, 256, 1, stride=1, bias=False),
                                              BatchNorm(256),
                                              nn.ReLU())
 
-        self.attention_refinement_module = AttentionRefinementModule(inplanes, inplanes)
-        self.attention_conv = nn.Conv2d(inplanes, 256, 1, stride=1, bias=False)
-        self.attention_bn = BatchNorm(256)
-        self.attention_relu = nn.ReLU()
+        # self.attention_refinement_module = AttentionRefinementModule(inplanes, inplanes)
+        # self.attention_conv = nn.Conv2d(inplanes, 256, 1, stride=1, bias=False)
+        # self.attention_bn = BatchNorm(256)
+        # self.attention_relu = nn.ReLU()
 
         self.conv1 = nn.Conv2d(1280, 256, 1, bias=False)
         # self.conv1 = nn.Conv2d(256*3, 256, 1, bias=False)
@@ -74,17 +77,22 @@ class ASPP(nn.Module):
 
     def forward(self, x):
         x1 = self.aspp1(x)
+        x1 = self.slam1(x1)
         x2 = self.aspp2(x)
+        x2 = self.slam2(x2)
         x3 = self.aspp3(x)
+        x3 = self.slam3(x3)
         x4 = self.aspp4(x)
+        x4 = self.slam4(x4)
 
-        x5 = self.attention_refinement_module(x)
-        x5 = self.attention_conv(x5)
-        x5 = self.attention_bn(x5)
-        x5 = self.attention_relu(x5)
+        # x5 = self.attention_refinement_module(x)
+        # x5 = self.attention_conv(x5)
+        # x5 = self.attention_bn(x5)
+        # x5 = self.attention_relu(x5)
 
-        # x5 = self.global_avg_pool(x)
-        # x5 = F.interpolate(x5, size=x4.size()[2:], mode='bilinear', align_corners=True)
+        x5 = self.global_avg_pool(x)
+        x5 = F.interpolate(x5, size=x4.size()[2:], mode='bilinear', align_corners=True)
+        x5 = self.slam5(x5)
         # print("x5 size = ", x5.size())
 
         # x5 = F.interpolate(x5, size=x4.size()[2:], mode='bilinear', align_corners=True)
@@ -113,8 +121,8 @@ class ASPP(nn.Module):
                 m.bias.data.zero_()
 
 
-def build_aspp(backbone, output_stride, BatchNorm, inplanes=2048):
-    return ASPP(backbone, output_stride, BatchNorm, inplanes=inplanes)
+def build_aspp(backbone, output_stride, BatchNorm):
+    return ASPP(backbone, output_stride, BatchNorm)
 
 # import math
 # import torch

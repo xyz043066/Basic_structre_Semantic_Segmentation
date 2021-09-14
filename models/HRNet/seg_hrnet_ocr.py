@@ -168,10 +168,7 @@ class SpatialOCR_Module(nn.Module):
                  dropout=0.1, 
                  bn_type=None):
         super(SpatialOCR_Module, self).__init__()
-        self.object_context_block = ObjectAttentionBlock2D(in_channels, 
-                                                           key_channels, 
-                                                           scale, 
-                                                           bn_type)
+        self.object_context_block = ObjectAttentionBlock2D(in_channels, key_channels, scale, bn_type)
         _in_channels = 2 * in_channels
 
         self.conv_bn_dropout = nn.Sequential(

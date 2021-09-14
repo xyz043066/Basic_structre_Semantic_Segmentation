@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
 from models.Deeplab.sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
-
+from models.Deeplab.spatial_path import *
 
 class _ASPPModule(nn.Module):
     def __init__(self, inplanes, planes, kernel_size, padding, dilation, BatchNorm):
@@ -131,11 +131,11 @@ class BasicBlock(nn.Module):
         return out
 
 
-class ResNet(nn.Module):
+class ResNet_new(nn.Module):
 
     def __init__(self, block, layers, output_stride, BatchNorm, pretrained=True, model_type='resnet-101'):
         self.inplanes = 128
-        super(ResNet, self).__init__()
+        super(ResNet_new, self).__init__()
         blocks = [1, 2, 4] # 原版 [1 2 4]
         if output_stride == 16:
             strides = [1, 2, 2, 1] # 原版 [1 2 2 1]
@@ -177,7 +177,9 @@ class ResNet(nn.Module):
         self.layer4 = self._make_MG_unit(block, 512, blocks=blocks, stride=strides[3], dilation=dilations[3],
                                          BatchNorm=BatchNorm)  # putput [2, 2048, 33, 33])
         # self.layer4 = self._make_layer(block, 512, layers[3], stride=strides[3], dilation=dilations[3], BatchNorm=BatchNorm)
-
+        self.convblock_1 = ConvBlock(in_channels=256+512, out_channels=512, kernel_size=1, stride=1, padding=0)
+        self.convblock_2 = ConvBlock(in_channels=512+1024, out_channels=1024, kernel_size=1, stride=1, padding=0)
+        self.convblock_3 = ConvBlock(in_channels=1024+2048, out_channels=2048, kernel_size=1, stride=1, padding=0)
         # low_level_feature
         # self.aspp_low_level_conv = _ASPPModule( (64+128)*4, 256, 1, padding=0, dilation=1, BatchNorm=BatchNorm)
 
@@ -223,29 +225,58 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, input):
+
+        #########################
+        ####### First conv ######
+        #########################
         x = self.relu1(self.bn1(self.conv1(input)))
         x = self.relu2(self.bn2(self.conv2(x)))
         x = self.relu3(self.bn3(self.conv3(x)))
+        x = self.maxpool(x)
         # x = self.conv1(input)
         # x = self.bn1(x)
         # x = self.relu(x)
-        x = self.maxpool(x)
         # x = self.relu11(self.bn11(self.conv11(input)))
         # x = self.relu22(self.bn22(self.conv22(x)))
-        # low_level_feat_0 = x
 
+        low_level_feat_0 = x
+
+        #########################
+        #######  stage 1 ########
+        #########################
         x = self.layer1(x)
-        low_level_feat_1 = x  # 原版
+        low_level_feat_1 = x
+
+        #########################
+        #######  stage 2 ########
+        #########################
         x = self.layer2(x)
-        low_level_feat_2 = x
-        # low_level_feat_2 = F.interpolate(low_level_feat_0, size=x.size()[2:], align_corners=True)
-        # low_level_feat_2 = low_level_feat_2 + x
-        # low_level_feat = x
-        # print(low_level_feat_layer1.size() , low_level_feat_layer2.size() )
-        # low_level_feat = self.aspp_low_level_conv(low_level_feat)
+        # low_level_feat_2 = x
+        low_level_feat_2 = F.interpolate(low_level_feat_0, size=x.size()[2:], align_corners=True)
+        low_level_feat_2 = torch.cat([low_level_feat_2, x], dim=1)
+        low_level_feat_2 = self.convblock_1(low_level_feat_2)
+        x = low_level_feat_2
+
+        #########################
+        #######  stage 3 ########
+        #########################
+
         x = self.layer3(x)
-        low_level_feat_3 = x
+        low_level_feat_3 = F.interpolate(low_level_feat_1, size=x.size()[2:], align_corners=True)
+        low_level_feat_3 = torch.cat([low_level_feat_3, x], dim=1)
+        low_level_feat_3 = self.convblock_2(low_level_feat_3)
+        x = low_level_feat_3
+
+        #########################
+        #######  stage 4 ########
+        #########################
+
         x = self.layer4(x)
+        low_level_feat_4 = F.interpolate(low_level_feat_2, size=x.size()[2:], align_corners=True)
+        low_level_feat_4 = torch.cat([low_level_feat_4, x], dim=1)
+        low_level_feat_4 = self.convblock_3(low_level_feat_4)
+        x = low_level_feat_4
+
         return x, low_level_feat_1, low_level_feat_2, low_level_feat_3
 
     def _init_weight(self):
@@ -283,12 +314,12 @@ class ResNet(nn.Module):
         self.load_state_dict(state_dict)
 
 
-def ResNet34(output_stride, BatchNorm, pretrained=True):
+def ResNet34_new(output_stride, BatchNorm, pretrained=True):
     """Constructs a ResNet-34 model.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    model = ResNet(BasicBlock, [3, 4, 6, 3], output_stride, BatchNorm, pretrained=pretrained, model_type='resnet-34')
+    model = ResNet_new(BasicBlock, [3, 4, 6, 3], output_stride, BatchNorm, pretrained=pretrained, model_type='resnet-34')
     return model
 
 
@@ -300,33 +331,33 @@ def ResNet34(output_stride, BatchNorm, pretrained=True):
 #     model = ResNet(Bottleneck, [2, 2, 2, 2], output_stride, BatchNorm, pretrained=pretrained, model_type='resnet-18')
 #     return model
 
-def ResNet18(output_stride, BatchNorm, pretrained=True):
-    model = ResNet(BasicBlock, [2, 2, 2, 2], output_stride, BatchNorm, pretrained=pretrained, model_type='resnet-18')
+def ResNet18_new(output_stride, BatchNorm, pretrained=True):
+    model = ResNet_new(BasicBlock, [2, 2, 2, 2], output_stride, BatchNorm, pretrained=pretrained, model_type='resnet-18')
     return model
 
 
-def ResNet50(output_stride, BatchNorm, pretrained=True):
+def ResNet50_new(output_stride, BatchNorm, pretrained=True):
     """Constructs a ResNet-101 model.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    model = ResNet(Bottleneck, [3, 4, 6, 3], output_stride, BatchNorm, pretrained=pretrained, model_type='resnet-50')
+    model = ResNet_new(Bottleneck, [3, 4, 6, 3], output_stride, BatchNorm, pretrained=pretrained, model_type='resnet-50')
     return model
 
 
-def ResNet101(output_stride, BatchNorm, pretrained=True):
+def ResNet101_new(output_stride, BatchNorm, pretrained=True):
     """Constructs a ResNet-101 model.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    model = ResNet(Bottleneck, [3, 4, 23, 3], output_stride, BatchNorm, pretrained=pretrained, model_type='resnet-101')
+    model = ResNet_new(Bottleneck, [3, 4, 23, 3], output_stride, BatchNorm, pretrained=pretrained, model_type='resnet-101')
     return model
 
 
 if __name__ == "__main__":
     import torch
 
-    model = ResNet101(BatchNorm=nn.BatchNorm2d, pretrained=True, output_stride=8)
+    model = ResNet101_new(BatchNorm=nn.BatchNorm2d, pretrained=True, output_stride=8)
     input = torch.rand(1, 3, 512, 512)
     output, low_level_feat = model(input)
     print(output.size())

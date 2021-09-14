@@ -23,9 +23,12 @@ class Decoder(nn.Module):
             raise NotImplementedError
 
         # self.convblock = ConvBlock(in_channels=256, out_channels=256, kernel_size=1, stride=1, padding=0)
-        self.AttentionFusionModule1 = AttentionFusionModule(in_channels=low_level_inplanes_3, out_channels=256)
-        self.AttentionFusionModule2 = AttentionFusionModule(in_channels=low_level_inplanes_2, out_channels=256)
-        self.AttentionFusionModule3 = AttentionFusionModule(in_channels=low_level_inplanes_1, out_channels=num_classes)
+        # self.AttentionFusionModule1 = AttentionFusionModule(in_channels=low_level_inplanes_3, out_channels=256)
+        # self.AttentionFusionModule2 = AttentionFusionModule(in_channels=low_level_inplanes_2, out_channels=256)
+        # self.AttentionFusionModule3 = AttentionFusionModule(in_channels=low_level_inplanes_1, out_channels=num_classes)
+        self.SFAM_1 = SFAM(in_channels_2=low_level_inplanes_3, in_channels_1=256)
+        self.SFAM_2  = SFAM(in_channels_2=low_level_inplanes_2, in_channels_1=256)
+        self.SFAM_3  = SFAM(in_channels_2=low_level_inplanes_1, in_channels_1=256)
          # self.conv1 = nn.Conv2d(low_level_inplanes, 48, 1, bias=False)
         # self.bn1 = BatchNorm(48)
         # self.relu = nn.ReLU()
@@ -40,15 +43,15 @@ class Decoder(nn.Module):
         #                                nn.Conv2d(256, num_classes, kernel_size=1, stride=1))
         #
         # self.feature_fusion_module = FeatureFusionModule(num_classes, 304)
-        self.final_conv = nn.Conv2d(in_channels=num_classes, out_channels=num_classes, kernel_size=1)
+        self.final_conv = nn.Conv2d(in_channels=256, out_channels=num_classes, kernel_size=1)
         self._init_weight()
 
     def forward(self, x, low_level_feat_1, low_level_feat_2, low_level_feat_3):
         # x = F.interpolate(x, size=low_level_feat_2.size()[2:], mode='bilinear', align_corners=True)
         # x = self.convblock(x)
-        x = self.AttentionFusionModule1(x, low_level_feat_3)
-        x = self.AttentionFusionModule2(x, low_level_feat_2)
-        x = self.AttentionFusionModule3(x, low_level_feat_1)
+        x = self.SFAM_1(low_level_feat_3, x)
+        x = self.SFAM_2(low_level_feat_2, x)
+        x = self.SFAM_3(low_level_feat_1, x)
         # low_level_feat1 = self.conv1(low_level_feat_1)
         # low_level_feat = self.bn1(low_level_feat_1)
         # low_level_feat = self.relu(low_level_feat_1)

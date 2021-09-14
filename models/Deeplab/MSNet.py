@@ -3,17 +3,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 from models.Deeplab.aspp import build_aspp
 from models.Deeplab.backbone import build_backbone
-from models.Deeplab.decoder import build_decoder
-from models.Deeplab.spatial_path import *
+from models.Deeplab.MSNet_decoder import build_decoder
 from models.Deeplab.sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
-
-
+from models.HRNet.seg_hrnet_ocr import *
+from models.Deeplab.spatial_path import *
 # from models.spatial_path import *
 
-class DeepLab(nn.Module):
+class MSNet(nn.Module):
     def __init__(self, backbone='resnet-18', output_stride=16, num_classes=21,
                  sync_bn=True, freeze_bn=False):
-        super(DeepLab, self).__init__()
+        super(MSNet, self).__init__()
         if backbone == 'drn':
             output_stride = 8
 
@@ -21,19 +20,19 @@ class DeepLab(nn.Module):
             BatchNorm = SynchronizedBatchNorm2d
         else:
             BatchNorm = nn.BatchNorm2d
-
+        self.out_channels = 256
         self.backbone = build_backbone(backbone, output_stride, BatchNorm)
-        self.aspp = build_aspp(backbone, output_stride, BatchNorm, inplanes=2048)
-        self.decoder = build_decoder(num_classes, backbone, BatchNorm)
+
+
+        self.decoder = build_decoder(num_classes, backbone, BatchNorm, output_stride)
+
         if freeze_bn:
             self.freeze_bn()
 
     def forward(self, input):
-        x, low_level_feat_1, low_level_feat_2, low_level_feat_3 = self.backbone(input)
-        x = self.aspp(x)
-        # print(x.shape)
-        # print(low_level_feat.shape)
-        x = self.decoder(x, low_level_feat_1)
+        x, _, low_level_feat_2, low_level_feat_1 = self.backbone(input)  # low_level_feat_1  =>  output stride : 16
+        # x = self.aspp(x)
+        x = self.decoder(x, low_level_feat_1, low_level_feat_2)
         x = F.interpolate(x, size=input.size()[2:], mode='bilinear', align_corners=True)
 
         return x
@@ -67,7 +66,7 @@ class DeepLab(nn.Module):
 
 
 if __name__ == "__main__":
-    model = DeepLab(backbone='resnet-18', output_stride=16)
+    model = MSNet(backbone='resnet-18', output_stride=16)
     print(model)
     model.eval()
     input = torch.rand(1, 3, 513, 513)

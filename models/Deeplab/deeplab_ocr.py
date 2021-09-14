@@ -22,14 +22,14 @@ class DeepLab_OCR(nn.Module):
             BatchNorm = nn.BatchNorm2d
 
         self.backbone = build_backbone(backbone, output_stride, BatchNorm)
-        self.aspp = build_aspp(backbone, output_stride, BatchNorm)
+        # self.aspp = build_aspp(backbone, output_stride, BatchNorm)
         last_inp_channels = 1024
         ocr_mid_channels = 512
         ocr_key_channels = 256
 
         self.conv3x3_ocr = nn.Sequential(
-            nn.Conv2d(ocr_key_channels, ocr_mid_channels,
-                      kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(2048, ocr_mid_channels,
+                      kernel_size=1, stride=1, padding=0),
             BatchNorm2d(ocr_mid_channels),
             nn.ReLU(inplace=relu_inplace),
         )
@@ -59,7 +59,7 @@ class DeepLab_OCR(nn.Module):
 
     def forward(self, input):
         x, low_level_feat, feats = self.backbone(input)
-        x = self.aspp(x)
+        # x = self.aspp(x)
         # ocr
         out_aux = self.aux_head(feats)
         # compute contrast feature

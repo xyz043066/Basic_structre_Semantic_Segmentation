@@ -1,4 +1,4 @@
-from models.Deeplab.backbone import resnet, res2net, xception, mobilenet
+from models.Deeplab.backbone import resnet, resnet_new, res2net, xception, mobilenet
 from models.Deeplab.backbone import drn
 
 
@@ -11,6 +11,10 @@ def build_backbone(backbone, output_stride, BatchNorm):
         return resnet.ResNet50(output_stride, BatchNorm)
     elif backbone == 'resnet-101':
         return resnet.ResNet101(output_stride, BatchNorm)
+    elif backbone == 'resnet-50-new':
+        return resnet_new.ResNet50_new(output_stride, BatchNorm)
+    elif backbone == 'resnet-101-new':
+        return resnet_new.ResNet101_new(output_stride, BatchNorm)
     elif backbone == 'res2net50_26w_4s':
         return res2net.res2net50_26w_4s()
     elif backbone == 'res2net50_26w_6s':
